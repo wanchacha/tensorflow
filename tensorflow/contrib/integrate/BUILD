@@ -31,6 +31,7 @@ py_library(
 py_test(
     name = "odes_test",
     srcs = ["python/ops/odes_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [
         ":integrate_py",
@@ -41,15 +42,4 @@ py_test(
         "//tensorflow/python:math_ops",
         "//third_party/py/numpy",
     ],
-)
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/METADATA",
-            "**/OWNERS",
-        ],
-    ),
 )

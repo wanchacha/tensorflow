@@ -105,30 +105,58 @@ class ConditionalTransformedDistribution(
     bijector_kwargs = bijector_kwargs or {}
     distribution_kwargs = distribution_kwargs or {}
     x = self.bijector.inverse(y, **bijector_kwargs)
-    ildj = self.bijector.inverse_log_det_jacobian(y, **bijector_kwargs)
+    event_ndims = self._maybe_get_static_event_ndims()
+    ildj = self.bijector.inverse_log_det_jacobian(
+        y, event_ndims=event_ndims, **bijector_kwargs)
+    if self.bijector._is_injective:  # pylint: disable=protected-access
+      return self._finish_log_prob_for_one_fiber(y, x, ildj,
+                                                 distribution_kwargs)
+
+    lp_on_fibers = [
+        self._finish_log_prob_for_one_fiber(y, x_i, ildj_i, distribution_kwargs)
+        for x_i, ildj_i in zip(x, ildj)]
+    return math_ops.reduce_logsumexp(array_ops.stack(lp_on_fibers), axis=0)
+
+  def _finish_log_prob_for_one_fiber(self, y, x, ildj, distribution_kwargs):
+    """Finish computation of log_prob on one element of the inverse image."""
     x = self._maybe_rotate_dims(x, rotate_right=True)
     log_prob = self.distribution.log_prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
       log_prob = math_ops.reduce_sum(log_prob, self._reduce_event_indices)
-    return ildj + log_prob
+    return math_ops.cast(ildj, log_prob.dtype) + log_prob
 
   @distribution_util.AppendDocstring(kwargs_dict=_condition_kwargs_dict)
   def _prob(self, y, bijector_kwargs=None, distribution_kwargs=None):
     bijector_kwargs = bijector_kwargs or {}
     distribution_kwargs = distribution_kwargs or {}
     x = self.bijector.inverse(y, **bijector_kwargs)
-    ildj = self.bijector.inverse_log_det_jacobian(y, **bijector_kwargs)
+    event_ndims = self._maybe_get_static_event_ndims()
+    ildj = self.bijector.inverse_log_det_jacobian(
+        y, event_ndims=event_ndims, **bijector_kwargs)
+    if self.bijector._is_injective:  # pylint: disable=protected-access
+      return self._finish_prob_for_one_fiber(y, x, ildj, distribution_kwargs)
+
+    prob_on_fibers = [
+        self._finish_prob_for_one_fiber(y, x_i, ildj_i, distribution_kwargs)
+        for x_i, ildj_i in zip(x, ildj)]
+    return sum(prob_on_fibers)
+
+  def _finish_prob_for_one_fiber(self, y, x, ildj, distribution_kwargs):
+    """Finish computation of prob on one element of the inverse image."""
     x = self._maybe_rotate_dims(x, rotate_right=True)
     prob = self.distribution.prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
       prob = math_ops.reduce_prod(prob, self._reduce_event_indices)
-    return math_ops.exp(ildj) * prob
+    return math_ops.exp(math_ops.cast(ildj, prob.dtype)) * prob
 
   @distribution_util.AppendDocstring(kwargs_dict=_condition_kwargs_dict)
   def _log_cdf(self, y, bijector_kwargs=None, distribution_kwargs=None):
     if self._is_maybe_event_override:
       raise NotImplementedError("log_cdf is not implemented when overriding "
                                 "event_shape")
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      raise NotImplementedError("log_cdf is not implemented when "
+                                "bijector is not injective.")
     bijector_kwargs = bijector_kwargs or {}
     distribution_kwargs = distribution_kwargs or {}
     x = self.bijector.inverse(y, **bijector_kwargs)
@@ -139,6 +167,9 @@ class ConditionalTransformedDistribution(
     if self._is_maybe_event_override:
       raise NotImplementedError("cdf is not implemented when overriding "
                                 "event_shape")
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      raise NotImplementedError("cdf is not implemented when "
+                                "bijector is not injective.")
     bijector_kwargs = bijector_kwargs or {}
     distribution_kwargs = distribution_kwargs or {}
     x = self.bijector.inverse(y, **bijector_kwargs)
@@ -150,6 +181,9 @@ class ConditionalTransformedDistribution(
     if self._is_maybe_event_override:
       raise NotImplementedError("log_survival_function is not implemented when "
                                 "overriding event_shape")
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      raise NotImplementedError("log_survival_function is not implemented when "
+                                "bijector is not injective.")
     bijector_kwargs = bijector_kwargs or {}
     distribution_kwargs = distribution_kwargs or {}
     x = self.bijector.inverse(y, **bijector_kwargs)
@@ -161,7 +195,38 @@ class ConditionalTransformedDistribution(
     if self._is_maybe_event_override:
       raise NotImplementedError("survival_function is not implemented when "
                                 "overriding event_shape")
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      raise NotImplementedError("survival_function is not implemented when "
+                                "bijector is not injective.")
     bijector_kwargs = bijector_kwargs or {}
     distribution_kwargs = distribution_kwargs or {}
     x = self.bijector.inverse(y, **bijector_kwargs)
     return self.distribution.survival_function(x, **distribution_kwargs)
+
+  @distribution_util.AppendDocstring(kwargs_dict=_condition_kwargs_dict)
+  def _quantile(self, value, bijector_kwargs=None, distribution_kwargs=None):
+    if self._is_maybe_event_override:
+      raise NotImplementedError("quantile is not implemented when overriding "
+                                "event_shape")
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      raise NotImplementedError("quantile is not implemented when "
+                                "bijector is not injective.")
+    bijector_kwargs = bijector_kwargs or {}
+    distribution_kwargs = distribution_kwargs or {}
+    # x_q is the "qth quantile" of X iff q = P[X <= x_q].  Now, since X =
+    # g^{-1}(Y), q = P[X <= x_q] = P[g^{-1}(Y) <= x_q] = P[Y <= g(x_q)],
+    # implies the qth quantile of Y is g(x_q).
+    inv_cdf = self.distribution.quantile(value, **distribution_kwargs)
+    return self.bijector.forward(inv_cdf, **bijector_kwargs)
+
+  def _maybe_get_static_event_ndims(self):
+    if self.event_shape.ndims is not None:
+      return self.event_shape.ndims
+
+    event_ndims = array_ops.size(self.event_shape_tensor())
+    event_ndims_ = distribution_util.maybe_get_static_value(event_ndims)
+
+    if event_ndims_ is not None:
+      return event_ndims_
+
+    return event_ndims

@@ -30,6 +30,7 @@ import android.os.SystemClock;
 import android.util.Size;
 import android.util.TypedValue;
 import android.view.Display;
+import android.view.Surface;
 import android.widget.Toast;
 import java.io.IOException;
 import java.util.LinkedList;
@@ -156,7 +157,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
             getAssets(), TF_OD_API_MODEL_FILE, TF_OD_API_LABELS_FILE, TF_OD_API_INPUT_SIZE);
         cropSize = TF_OD_API_INPUT_SIZE;
       } catch (final IOException e) {
-        LOGGER.e("Exception initializing classifier!", e);
+        LOGGER.e(e, "Exception initializing classifier!");
         Toast toast =
             Toast.makeText(
                 getApplicationContext(), "Classifier could not be initialized", Toast.LENGTH_SHORT);
@@ -168,12 +169,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     previewWidth = size.getWidth();
     previewHeight = size.getHeight();
 
-    final Display display = getWindowManager().getDefaultDisplay();
-    final int screenOrientation = display.getRotation();
-
-    LOGGER.i("Sensor orientation: %d, Screen orientation: %d", rotation, screenOrientation);
-
-    sensorOrientation = rotation + screenOrientation;
+    sensorOrientation = rotation - getScreenOrientation();
+    LOGGER.i("Camera orientation relative to screen canvas: %d", sensorOrientation);
 
     LOGGER.i("Initializing at size %dx%d", previewWidth, previewHeight);
     rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Config.ARGB_8888);

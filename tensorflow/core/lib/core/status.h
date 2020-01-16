@@ -24,6 +24,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/stringpiece.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
+#include "tensorflow/core/platform/types.h"
 
 namespace tensorflow {
 
@@ -96,6 +97,31 @@ class Status {
   void SlowCopyFrom(const State* src);
 };
 
+// Helper class to manage multiple child status values.
+class StatusGroup {
+ public:
+  // Utility function to mark a Status as derived. By marking derived status,
+  // Derived status messages are ignored when reporting errors to end users.
+  static Status MakeDerived(const Status& s);
+  static bool IsDerived(const Status& s);
+
+  // Return a merged status with combined child status messages with a summary.
+  Status as_summary_status() const;
+  // Return a merged status with combined child status messages with
+  // concatenation.
+  Status as_concatenated_status() const;
+
+  bool ok() const { return ok_; }
+
+  // Augment this group with the child status `status`.
+  void Update(const Status& status);
+
+ private:
+  bool ok_ = true;
+  size_t num_ok_ = 0;
+  std::vector<Status> children_;
+};
+
 inline Status::Status(const Status& s)
     : state_((s.state_ == NULL) ? NULL : new State(*s.state_)) {}
 
@@ -127,11 +153,11 @@ inline tensorflow::string* TfCheckOpHelper(::tensorflow::Status v,
   return TfCheckOpHelperOutOfLine(v, msg);
 }
 
-#define TF_DO_CHECK_OK(val, level)                  \
-  while (auto _result = TfCheckOpHelper(val, #val)) \
-    LOG(level) << *(_result)
+#define TF_DO_CHECK_OK(val, level)                                \
+  while (auto _result = ::tensorflow::TfCheckOpHelper(val, #val)) \
+  LOG(level) << *(_result)
 
-#define TF_CHECK_OK(val)  TF_DO_CHECK_OK(val, FATAL)
+#define TF_CHECK_OK(val) TF_DO_CHECK_OK(val, FATAL)
 #define TF_QCHECK_OK(val) TF_DO_CHECK_OK(val, QFATAL)
 
 // DEBUG only version of TF_CHECK_OK.  Compiler still parses 'val' even in opt

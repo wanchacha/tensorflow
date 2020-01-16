@@ -198,6 +198,13 @@ TEST(TensorShapeTest, DataType) {
   EXPECT_EQ(TensorShapeTestHelper::data_type(&s2), DT_INVALID);
 }
 
+TEST(TensorShapeTest, ostream) {
+  TensorShape s({10, 5, 4});
+  std::stringstream ss;
+  ss << s;
+  EXPECT_EQ(ss.str(), "[10,5,4]");
+}
+
 // -----------------------------------------------------------------------
 // An old implementation of TensorShape using a different representation,
 // preserved here in the unittest to allow us to have a randomized unittest
@@ -359,7 +366,8 @@ Status TensorShapeOld::IsValidShape(const TensorShapeProto& proto) {
   for (const auto& d : proto.dim()) {
     if (d.size() < 0) {
       return errors::InvalidArgument("Shape ", DebugString(proto),
-                                     " has negative dimensions");
+                                     " has negative dimensions; ",
+                                     "perhaps an un-fed placeholder?");
     }
     num_elements *= d.size();
     if (num_elements > kMaxElements) {
@@ -581,7 +589,8 @@ TEST(TensorShapeTest, Large) {
 TEST(TensorShapeTest, Overflow) {
   int64 one = 1;
   std::vector<std::vector<int64>> overflows = {
-      {1 << 30, 1 << 30, 1 << 30}, {1 << 5, (one << 60) + 1},
+      {1 << 30, 1 << 30, 1 << 30},
+      {1 << 5, (one << 60) + 1},
   };
   for (const auto& overflow : overflows) {
     TensorShapeProto proto;
@@ -674,6 +683,15 @@ static std::vector<int64> MakeSizes(int arg) {
   }
   return sizes;
 }
+
+static void BM_TensorShape_Init(int iters, int arg) {
+  auto sizes = MakeSizes(arg);
+  while (--iters > 0) {
+    TensorShape shape(sizes);
+    tensorflow::testing::DoNotOptimize(shape.num_elements());
+  }
+}
+BENCHMARK(BM_TensorShape_Init)->Arg(0)->Arg(1)->Arg(2)->Arg(3)->Arg(4);
 
 static void BM_TensorShape_Assign(int iters, int arg) {
   TensorShape s(MakeSizes(arg));

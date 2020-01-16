@@ -21,6 +21,7 @@ import static org.junit.Assert.fail;
 
 import java.util.HashMap;
 import java.util.Map;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -28,6 +29,7 @@ import org.tensorflow.Graph;
 import org.tensorflow.Output;
 import org.tensorflow.Session;
 import org.tensorflow.Tensor;
+import org.tensorflow.Tensors;
 import org.tensorflow.types.UInt8;
 
 /** Unit tests for {@link org.tensorflow.Scope}. */
@@ -186,16 +188,16 @@ public class ScopeTest {
     private final Output<T> output;
 
     static Const<Integer> create(Scope s, int v) {
-      return create(s, Tensor.create(v, Integer.class));
+      return create(s, Tensors.create(v));
     }
 
     static Const<Integer> create(Scope s, int[] v) {
-      return create(s, Tensor.create(v, Integer.class));
+      return create(s, Tensors.create(v));
     }
 
     static <T> Const<T> create(Scope s, Tensor<T> value) {
       return new Const<T>(
-          s.graph()
+          s.env()
               .opBuilder("Const", s.makeOpName("Const"))
               .setAttr("dtype", value.dataType())
               .setAttr("value", value)
@@ -206,7 +208,7 @@ public class ScopeTest {
     static <T> Const<T> create(Scope s, Object v, Class<T> type) {
       try (Tensor<T> value = Tensor.create(v, type)) {
         return new Const<T>(
-            s.graph()
+            s.env()
                 .opBuilder("Const", s.makeOpName("Const"))
                 .setAttr("dtype", value.dataType())
                 .setAttr("value", value)
@@ -229,7 +231,7 @@ public class ScopeTest {
 
     static <T> Mean<T> create(Scope s, Output<T> input, Output<T> reductionIndices) {
       return new Mean<T>(
-          s.graph()
+          s.env()
               .opBuilder("Mean", s.makeOpName("Mean"))
               .addInput(input)
               .addInput(reductionIndices)
@@ -251,7 +253,7 @@ public class ScopeTest {
 
     static <T> SquaredDifference<T> create(Scope s, Output<T> x, Output<T> y) {
       return new SquaredDifference<T>(
-          s.graph()
+          s.env()
               .opBuilder("SquaredDifference", s.makeOpName("SquaredDifference"))
               .addInput(x)
               .addInput(y)

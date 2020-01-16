@@ -18,15 +18,18 @@ package org.tensorflow;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -48,7 +51,7 @@ public class TensorTest {
     byte[] strings = "test".getBytes(UTF_8);
     long[] strings_shape = {};
     byte[] strings_; // raw TF_STRING
-    try (Tensor<String> t = Tensor.create(strings, String.class)) {
+    try (Tensor<String> t = Tensors.create(strings)) {
       ByteBuffer to = ByteBuffer.allocate(t.numBytes());
       t.writeTo(to);
       strings_ = to.array();
@@ -100,7 +103,7 @@ public class TensorTest {
                     : ByteOrder.LITTLE_ENDIAN)
             .asDoubleBuffer()
             .put(doubles);
-    buf.flip();
+    flipBuffer(buf);
     try (Tensor<Double> t = Tensor.create(new long[] {doubles.length}, buf)) {
       double[] actual = new double[doubles.length];
       assertArrayEquals(doubles, t.copyTo(actual), EPSILON);
@@ -169,40 +172,40 @@ public class TensorTest {
     long[] longs = {1L, 2L, 3L};
     boolean[] bools = {true, false, true};
 
-    try (Tensor<Integer> tints = Tensor.create(ints, Integer.class);
-        Tensor<Float> tfloats = Tensor.create(floats, Float.class);
-        Tensor<Double> tdoubles = Tensor.create(doubles, Double.class);
-        Tensor<Long> tlongs = Tensor.create(longs, Long.class);
-        Tensor<Boolean> tbools = Tensor.create(bools, Boolean.class)) {
+    try (Tensor<Integer> tints = Tensors.create(ints);
+        Tensor<Float> tfloats = Tensors.create(floats);
+        Tensor<Double> tdoubles = Tensors.create(doubles);
+        Tensor<Long> tlongs = Tensors.create(longs);
+        Tensor<Boolean> tbools = Tensors.create(bools)) {
 
       // validate that any datatype is readable with ByteBuffer (content, position)
       {
         ByteBuffer bbuf = ByteBuffer.allocate(1024).order(ByteOrder.nativeOrder());
 
-        bbuf.clear(); // FLOAT
+        clearBuffer(bbuf); // FLOAT
         tfloats.writeTo(bbuf);
         assertEquals(tfloats.numBytes(), bbuf.position());
-        bbuf.flip();
+        flipBuffer(bbuf);
         assertEquals(floats[0], bbuf.asFloatBuffer().get(0), EPSILON);
-        bbuf.clear(); // DOUBLE
+        clearBuffer(bbuf); // DOUBLE
         tdoubles.writeTo(bbuf);
         assertEquals(tdoubles.numBytes(), bbuf.position());
-        bbuf.flip();
+        flipBuffer(bbuf);
         assertEquals(doubles[0], bbuf.asDoubleBuffer().get(0), EPSILON);
-        bbuf.clear(); // INT32
+        clearBuffer(bbuf); // INT32
         tints.writeTo(bbuf);
         assertEquals(tints.numBytes(), bbuf.position());
-        bbuf.flip();
+        flipBuffer(bbuf);
         assertEquals(ints[0], bbuf.asIntBuffer().get(0));
-        bbuf.clear(); // INT64
+        clearBuffer(bbuf); // INT64
         tlongs.writeTo(bbuf);
         assertEquals(tlongs.numBytes(), bbuf.position());
-        bbuf.flip();
+        flipBuffer(bbuf);
         assertEquals(longs[0], bbuf.asLongBuffer().get(0));
-        bbuf.clear(); // BOOL
+        clearBuffer(bbuf); // BOOL
         tbools.writeTo(bbuf);
         assertEquals(tbools.numBytes(), bbuf.position());
-        bbuf.flip();
+        flipBuffer(bbuf);
         assertEquals(bools[0], bbuf.get(0) != 0);
       }
 
@@ -254,7 +257,7 @@ public class TensorTest {
                         : ByteOrder.LITTLE_ENDIAN)
                 .asDoubleBuffer();
         tdoubles.writeTo(foreignBuf);
-        foreignBuf.flip();
+        flipBuffer(foreignBuf);
         double[] actual = new double[foreignBuf.remaining()];
         foreignBuf.get(actual);
         assertArrayEquals(doubles, actual, EPSILON);
@@ -296,35 +299,35 @@ public class TensorTest {
 
   @Test
   public void scalars() {
-    try (Tensor<Float> t = Tensor.create(2.718f).expect(Float.class)) {
+    try (Tensor<Float> t = Tensors.create(2.718f)) {
       assertEquals(DataType.FLOAT, t.dataType());
       assertEquals(0, t.numDimensions());
       assertEquals(0, t.shape().length);
       assertEquals(2.718f, t.floatValue(), EPSILON_F);
     }
 
-    try (Tensor<Double> t = Tensor.create(3.1415).expect(Double.class)) {
+    try (Tensor<Double> t = Tensors.create(3.1415)) {
       assertEquals(DataType.DOUBLE, t.dataType());
       assertEquals(0, t.numDimensions());
       assertEquals(0, t.shape().length);
       assertEquals(3.1415, t.doubleValue(), EPSILON);
     }
 
-    try (Tensor<Integer> t = Tensor.create(-33).expect(Integer.class)) {
+    try (Tensor<Integer> t = Tensors.create(-33)) {
       assertEquals(DataType.INT32, t.dataType());
       assertEquals(0, t.numDimensions());
       assertEquals(0, t.shape().length);
       assertEquals(-33, t.intValue());
     }
 
-    try (Tensor<Long> t = Tensor.create(8589934592L).expect(Long.class)) {
+    try (Tensor<Long> t = Tensors.create(8589934592L)) {
       assertEquals(DataType.INT64, t.dataType());
       assertEquals(0, t.numDimensions());
       assertEquals(0, t.shape().length);
       assertEquals(8589934592L, t.longValue());
     }
 
-    try (Tensor<Boolean> t = Tensor.create(true).expect(Boolean.class)) {
+    try (Tensor<Boolean> t = Tensors.create(true)) {
       assertEquals(DataType.BOOL, t.dataType());
       assertEquals(0, t.numDimensions());
       assertEquals(0, t.shape().length);
@@ -332,7 +335,7 @@ public class TensorTest {
     }
 
     final byte[] bytes = {1, 2, 3, 4};
-    try (Tensor<String> t = Tensor.create(bytes).expect(String.class)) {
+    try (Tensor<String> t = Tensors.create(bytes)) {
       assertEquals(DataType.STRING, t.dataType());
       assertEquals(0, t.numDimensions());
       assertEquals(0, t.shape().length);
@@ -343,7 +346,7 @@ public class TensorTest {
   @Test
   public void nDimensional() {
     double[] vector = {1.414, 2.718, 3.1415};
-    try (Tensor<Double> t = Tensor.create(vector).expect(Double.class)) {
+    try (Tensor<Double> t = Tensors.create(vector)) {
       assertEquals(DataType.DOUBLE, t.dataType());
       assertEquals(1, t.numDimensions());
       assertArrayEquals(new long[] {3}, t.shape());
@@ -353,7 +356,7 @@ public class TensorTest {
     }
 
     int[][] matrix = {{1, 2, 3}, {4, 5, 6}};
-    try (Tensor<Integer> t = Tensor.create(matrix).expect(Integer.class)) {
+    try (Tensor<Integer> t = Tensors.create(matrix)) {
       assertEquals(DataType.INT32, t.dataType());
       assertEquals(2, t.numDimensions());
       assertArrayEquals(new long[] {2, 3}, t.shape());
@@ -365,7 +368,7 @@ public class TensorTest {
     long[][][] threeD = {
       {{1}, {3}, {5}, {7}, {9}}, {{2}, {4}, {6}, {8}, {0}},
     };
-    try (Tensor<Long> t = Tensor.create(threeD).expect(Long.class)) {
+    try (Tensor<Long> t = Tensors.create(threeD)) {
       assertEquals(DataType.INT64, t.dataType());
       assertEquals(3, t.numDimensions());
       assertArrayEquals(new long[] {2, 5, 1}, t.shape());
@@ -379,7 +382,7 @@ public class TensorTest {
       {{{false, false, true, true}, {false, true, false, false}}},
       {{{false, true, false, true}, {false, true, true, false}}},
     };
-    try (Tensor<Boolean> t = Tensor.create(fourD).expect(Boolean.class)) {
+    try (Tensor<Boolean> t = Tensors.create(fourD)) {
       assertEquals(DataType.BOOL, t.dataType());
       assertEquals(4, t.numDimensions());
       assertArrayEquals(new long[] {3, 1, 2, 4}, t.shape());
@@ -397,7 +400,7 @@ public class TensorTest {
         matrix[i][j] = String.format("(%d, %d) = %d", i, j, i << j).getBytes(UTF_8);
       }
     }
-    try (Tensor<String> t = Tensor.create(matrix).expect(String.class)) {
+    try (Tensor<String> t = Tensors.create(matrix)) {
       assertEquals(DataType.STRING, t.dataType());
       assertEquals(2, t.numDimensions());
       assertArrayEquals(new long[] {4, 3}, t.shape());
@@ -422,7 +425,17 @@ public class TensorTest {
       assertArrayEquals(new long[] {4}, t.shape());
 
       byte[] got = t.copyTo(new byte[4]);
-      assertArrayEquals(got, vector);
+      assertArrayEquals(vector, got);
+    }
+  }
+
+  @Test
+  public void testCreateFromArrayOfBoxed() {
+    Integer[] vector = new Integer[] {1, 2, 3, 4};
+    try (Tensor<Integer> t = Tensor.create(vector, Integer.class)) {
+      fail("Tensor.create() should fail because it was given an array of boxed values");
+    } catch (IllegalArgumentException e) {
+      // The expected exception
     }
   }
 
@@ -443,8 +456,7 @@ public class TensorTest {
 
   @Test
   public void failCopyToOnIncompatibleDestination() {
-    try (final Tensor<Integer> matrix =
-        Tensor.create(new int[][] {{1, 2}, {3, 4}}, Integer.class)) {
+    try (final Tensor<Integer> matrix = Tensors.create(new int[][] {{1, 2}, {3, 4}})) {
       try {
         matrix.copyTo(new int[2]);
         fail("should have failed on dimension mismatch");
@@ -470,7 +482,7 @@ public class TensorTest {
 
   @Test
   public void failCopyToOnScalar() {
-    try (final Tensor<Integer> scalar = Tensor.create(3, Integer.class)) {
+    try (final Tensor<Integer> scalar = Tensors.create(3)) {
       try {
         scalar.copyTo(3);
         fail("copyTo should fail on scalar tensors, suggesting use of primitive accessors instead");
@@ -491,7 +503,7 @@ public class TensorTest {
 
   @Test
   public void failOnZeroDimension() {
-    try (Tensor<Integer> t = Tensor.create(new int[3][0][1]).expect(Integer.class)) {
+    try (Tensor<Integer> t = Tensors.create(new int[3][0][1])) {
       fail("should fail on creating a Tensor where one of the dimensions is 0");
     } catch (IllegalArgumentException e) {
       // The expected exception.
@@ -511,6 +523,25 @@ public class TensorTest {
   }
 
   @Test
+  public void eagerTensorIsReleasedAfterSessionIsClosed() {
+    Tensor<Integer> sum;
+    try (EagerSession session = EagerSession.create()) {
+      Output<?> x = TestUtil.constant(session, "Const1", 10);
+      Output<?> y = TestUtil.constant(session, "Const2", 20);
+      sum = TestUtil.<Integer>addN(session, x, y).tensor();
+      assertNotEquals(0L, sum.getNativeHandle());
+      assertEquals(30, sum.intValue());
+    }
+    assertEquals(0L, sum.getNativeHandle());
+    try {
+      sum.intValue();
+      fail();
+    } catch (NullPointerException e) {
+      // expected.
+    }
+  }
+
+  @Test
   public void fromHandle() {
     // fromHandle is a package-visible method intended for use when the C TF_Tensor object has been
     // created independently of the Java code. In practice, two Tensor instances MUST NOT have the
@@ -519,12 +550,44 @@ public class TensorTest {
     // An exception is made for this test, where the pitfalls of this is avoided by not calling
     // close() on both Tensors.
     final float[][] matrix = {{1, 2, 3}, {4, 5, 6}};
-    try (Tensor<Float> src = Tensor.create(matrix).expect(Float.class)) {
+    try (Tensor<Float> src = Tensors.create(matrix)) {
       Tensor<Float> cpy = Tensor.fromHandle(src.getNativeHandle()).expect(Float.class);
       assertEquals(src.dataType(), cpy.dataType());
       assertEquals(src.numDimensions(), cpy.numDimensions());
       assertArrayEquals(src.shape(), cpy.shape());
       assertArrayEquals(matrix, cpy.copyTo(new float[2][3]));
     }
+  }
+
+  @Test
+  public void gracefullyFailCreationFromNullArrayForStringTensor() {
+    // Motivated by: https://github.com/tensorflow/tensorflow/issues/17130
+    byte[][] array = new byte[1][];
+    try {
+      Tensors.create(array);
+    } catch (NullPointerException e) {
+      // expected.
+    }
+  }
+
+  // Workaround for cross compiliation
+  // (e.g., javac -source 1.9 -target 1.8).
+  //
+  // In Java 8 and prior, subclasses of java.nio.Buffer (e.g., java.nio.DoubleBuffer) inherited the
+  // "flip()" and "clear()" methods from java.nio.Buffer resulting in the signature:
+  //   Buffer flip();
+  // In Java 9 these subclasses had their own methods like:
+  //   DoubleBuffer flip();
+  // As a result, compiling for 1.9 source for a target of JDK 1.8 would result in errors at runtime
+  // like:
+  //
+  // java.lang.NoSuchMethodError: java.nio.DoubleBuffer.flip()Ljava/nio/DoubleBuffer
+  private static void flipBuffer(Buffer buf) {
+    buf.flip();
+  }
+
+  // See comment for flipBuffer()
+  private static void clearBuffer(Buffer buf) {
+    buf.clear();
   }
 }

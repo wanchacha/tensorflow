@@ -66,9 +66,9 @@ public class LabelImage {
       float[] labelProbabilities = executeInceptionGraph(graphDef, image);
       int bestLabelIdx = maxIndex(labelProbabilities);
       System.out.println(
-          String.format(
-              "BEST MATCH: %s (%.2f%% likely)",
-              labels.get(bestLabelIdx), labelProbabilities[bestLabelIdx] * 100f));
+          String.format("BEST MATCH: %s (%.2f%% likely)",
+              labels.get(bestLabelIdx),
+              labelProbabilities[bestLabelIdx] * 100f));
     }
   }
 
@@ -101,6 +101,7 @@ public class LabelImage {
                   b.constant("mean", mean)),
               b.constant("scale", scale));
       try (Session s = new Session(g)) {
+        // Generally, there may be multiple output tensors, all of them must be closed to prevent resource leaks.
         return s.runner().fetch(output.op().name()).run().get(0).expect(Float.class);
       }
     }
@@ -110,6 +111,7 @@ public class LabelImage {
     try (Graph g = new Graph()) {
       g.importGraphDef(graphDef);
       try (Session s = new Session(g);
+          // Generally, there may be multiple output tensors, all of them must be closed to prevent resource leaks.
           Tensor<Float> result =
               s.runner().feed("input", image).fetch("output").run().get(0).expect(Float.class)) {
         final long[] rshape = result.shape();
@@ -205,7 +207,6 @@ public class LabelImage {
             .<T>output(0);
       }
     }
-
     Output<String> constant(String name, byte[] value) {
       return this.constant(name, value, String.class);
     }
@@ -229,7 +230,6 @@ public class LabelImage {
     private <T, U, V> Output<T> binaryOp3(String type, Output<U> in1, Output<V> in2) {
       return g.opBuilder(type, type).addInput(in1).addInput(in2).build().<T>output(0);
     }
-
     private Graph g;
   }
 }

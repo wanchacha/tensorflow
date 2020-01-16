@@ -45,12 +45,11 @@ def main(argv):
         # that the examples are well mixed.
         train.shuffle(1000).batch(128)
         # Repeat forever
-        .repeat().make_one_shot_iterator().get_next())
+        .repeat())
 
   # Build the validation input_fn.
   def input_test():
-    return (test.shuffle(1000).batch(128)
-            .make_one_shot_iterator().get_next())
+    return test.shuffle(1000).batch(128)
 
   # The following code demonstrates two of the ways that `feature_columns` can
   # be used to build a model with categorical inputs.
@@ -67,7 +66,7 @@ def main(argv):
 
   # The second way, appropriate for an unspecified vocabulary, is to create a
   # hashed column. It will create a fixed length list of weights, and
-  # automatically assign each input categort to a weight. Due to the
+  # automatically assign each input category to a weight. Due to the
   # pseudo-randomness of the process, some weights may be shared between
   # categories, while others will remain unused.
   make_column = tf.feature_column.categorical_column_with_hash_bucket(

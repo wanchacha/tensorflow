@@ -1,5 +1,6 @@
 # Description:
 #   This directory contains common utilities used in boosted_trees.
+
 licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
@@ -14,17 +15,6 @@ package(
 load("//tensorflow:tensorflow.bzl", "py_test")
 load("//tensorflow:tensorflow.bzl", "tf_cc_test")
 load("//tensorflow:tensorflow.bzl", "tf_cc_binary")
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/OWNERS",
-        ],
-    ),
-    visibility = ["//tensorflow:__subpackages__"],
-)
 
 # Utils
 
@@ -73,6 +63,19 @@ tf_cc_test(
     name = "examples_iterable_test",
     size = "small",
     srcs = ["utils/examples_iterable_test.cc"],
+    deps = [
+        ":utils",
+        "//tensorflow/core:tensor_testutil",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
+        "@com_google_absl//absl/algorithm:container",
+    ],
+)
+
+tf_cc_test(
+    name = "example_test",
+    size = "small",
+    srcs = ["utils/example_test.cc"],
     deps = [
         ":utils",
         "//tensorflow/core:tensor_testutil",
@@ -132,7 +135,6 @@ tf_cc_test(
         ":random_tree_gen",
         "//tensorflow/contrib/boosted_trees/resources:decision_tree_ensemble_resource",
         "//tensorflow/core:framework_headers_lib",
-        "//tensorflow/core:lib",
         "//tensorflow/core:tensor_testutil",
         "//tensorflow/core:test",
         "//tensorflow/core:test_main",
@@ -149,7 +151,6 @@ cc_library(
     deps = [
         ":utils",
         "//tensorflow/core:framework_headers_lib",
-        "//tensorflow/core:lib",
         "//tensorflow/core:test",
         "//tensorflow/core:testlib",
     ],
@@ -197,7 +198,6 @@ tf_cc_test(
     srcs = ["quantiles/weighted_quantiles_buffer_test.cc"],
     deps = [
         ":weighted_quantiles",
-        "//tensorflow/core",
         "//tensorflow/core:lib",
         "//tensorflow/core:test",
         "//tensorflow/core:test_main",
@@ -210,7 +210,6 @@ tf_cc_test(
     srcs = ["quantiles/weighted_quantiles_summary_test.cc"],
     deps = [
         ":weighted_quantiles",
-        "//tensorflow/core",
         "//tensorflow/core:lib",
         "//tensorflow/core:test",
         "//tensorflow/core:test_main",
@@ -262,6 +261,8 @@ py_library(
     srcs = ["learner/batch/base_split_handler.py"],
     srcs_version = "PY2AND3",
     deps = [
+        "//tensorflow/contrib/boosted_trees:batch_ops_utils_py",
+        "//tensorflow/python:control_flow_ops",
     ],
 )
 
@@ -271,21 +272,34 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":base_split_handler",
-        "//tensorflow/contrib/boosted_trees:quantile_ops_py",
         "//tensorflow/contrib/boosted_trees:split_handler_ops_py",
         "//tensorflow/contrib/boosted_trees:stats_accumulator_ops_py",
+        "//tensorflow/python:array_ops",
+        "//tensorflow/python:constant_op",
+        "//tensorflow/python:control_flow_ops",
+        "//tensorflow/python:dtypes",
+        "//tensorflow/python:math_ops",
     ],
 )
 
 py_test(
     name = "categorical_split_handler_test",
     srcs = ["learner/batch/categorical_split_handler_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [
         ":categorical_split_handler",
         "//tensorflow/contrib/boosted_trees/proto:learner_proto_py",
         "//tensorflow/contrib/boosted_trees/proto:split_info_proto_py",
+        "//tensorflow/python:array_ops",
+        "//tensorflow/python:constant_op",
+        "//tensorflow/python:dtypes",
+        "//tensorflow/python:framework_ops",
         "//tensorflow/python:framework_test_lib",
+        "//tensorflow/python:platform_test",
+        "//tensorflow/python:resources",
+        "//tensorflow/python:sparse_tensor",
+        "//tensorflow/python:tensor_shape",
     ],
 )
 
@@ -298,19 +312,35 @@ py_library(
         "//tensorflow/contrib/boosted_trees:quantile_ops_py",
         "//tensorflow/contrib/boosted_trees:split_handler_ops_py",
         "//tensorflow/contrib/boosted_trees:stats_accumulator_ops_py",
-        "//tensorflow/contrib/boosted_trees/proto:quantiles_proto_py",
+        "//tensorflow/python:array_ops",
+        "//tensorflow/python:constant_op",
+        "//tensorflow/python:control_flow_ops",
+        "//tensorflow/python:dtypes",
+        "//tensorflow/python:framework_ops",
+        "//tensorflow/python:function",
+        "//tensorflow/python:math_ops",
+        "//tensorflow/python:sparse_tensor",
     ],
 )
 
 py_test(
     name = "ordinal_split_handler_test",
     srcs = ["learner/batch/ordinal_split_handler_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [
         ":ordinal_split_handler",
         "//tensorflow/contrib/boosted_trees/proto:learner_proto_py",
         "//tensorflow/contrib/boosted_trees/proto:split_info_proto_py",
+        "//tensorflow/python:array_ops",
+        "//tensorflow/python:constant_op",
+        "//tensorflow/python:dtypes",
+        "//tensorflow/python:framework_ops",
         "//tensorflow/python:framework_test_lib",
+        "//tensorflow/python:platform_test",
+        "//tensorflow/python:resources",
+        "//tensorflow/python:sparse_tensor",
+        "//tensorflow/python:tensor_shape",
     ],
 )
 
@@ -369,51 +399,9 @@ tf_cc_test(
 )
 
 # Learner/stochastic
-
-cc_library(
-    name = "feature-column-handlers",
-    srcs = [
-        "learner/stochastic/handlers/bias-feature-column-handler.cc",
-        "learner/stochastic/handlers/categorical-feature-column-handler.cc",
-        "learner/stochastic/handlers/dense-quantized-feature-column-handler.cc",
-        "learner/stochastic/handlers/sparse-quantized-feature-column-handler.cc",
-    ],
-    hdrs = [
-        "learner/stochastic/handlers/bias-feature-column-handler.h",
-        "learner/stochastic/handlers/categorical-feature-column-handler.h",
-        "learner/stochastic/handlers/dense-quantized-feature-column-handler.h",
-        "learner/stochastic/handlers/feature-column-handler.h",
-        "learner/stochastic/handlers/sparse-quantized-feature-column-handler.h",
-    ],
-    deps = [
-        ":feature-split-candidate",
-        ":feature-stats-accumulator",
-        "//tensorflow/contrib/boosted_trees/proto:learner_proto_cc",
-        "//tensorflow/core:framework_headers_lib",
-        "//tensorflow/core:protos_all_cc",
-    ],
-)
-
-tf_cc_test(
-    name = "feature-column-handlers_test",
-    size = "small",
-    srcs = [
-        "learner/stochastic/handlers/bias-feature-column-handler_test.cc",
-        "learner/stochastic/handlers/categorical-feature-column-handler_test.cc",
-        "learner/stochastic/handlers/dense-quantized-feature-column-handler_test.cc",
-        "learner/stochastic/handlers/sparse-quantized-feature-column-handler_test.cc",
-    ],
-    deps = [
-        ":feature-column-handlers",
-        "//tensorflow/core:tensor_testutil",
-        "//tensorflow/core:test",
-        "//tensorflow/core:test_main",
-    ],
-)
-
 cc_library(
     name = "gradient-stats",
-    hdrs = ["learner/stochastic/stats/gradient-stats.h"],
+    hdrs = ["learner/common/stats/gradient-stats.h"],
     deps = [
         "//tensorflow/core:framework_headers_lib",
         "//third_party/eigen3",
@@ -422,7 +410,7 @@ cc_library(
 
 cc_library(
     name = "node-stats",
-    hdrs = ["learner/stochastic/stats/node-stats.h"],
+    hdrs = ["learner/common/stats/node-stats.h"],
     deps = [
         ":gradient-stats",
         "//tensorflow/contrib/boosted_trees/proto:learner_proto_cc",
@@ -434,7 +422,7 @@ cc_library(
 
 cc_library(
     name = "split-stats",
-    hdrs = ["learner/stochastic/stats/split-stats.h"],
+    hdrs = ["learner/common/stats/split-stats.h"],
     deps = [
         ":node-stats",
     ],
@@ -442,7 +430,7 @@ cc_library(
 
 cc_library(
     name = "feature-split-candidate",
-    hdrs = ["learner/stochastic/stats/feature-split-candidate.h"],
+    hdrs = ["learner/common/stats/feature-split-candidate.h"],
     deps = [
         ":split-stats",
         "//tensorflow/contrib/boosted_trees/proto:tree_config_proto_cc",
@@ -452,7 +440,7 @@ cc_library(
 tf_cc_test(
     name = "node-stats_test",
     size = "small",
-    srcs = ["learner/stochastic/stats/node-stats_test.cc"],
+    srcs = ["learner/common/stats/node-stats_test.cc"],
     deps = [
         ":node-stats",
         "//tensorflow/core:tensor_testutil",

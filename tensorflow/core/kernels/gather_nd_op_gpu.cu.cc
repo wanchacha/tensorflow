@@ -20,7 +20,7 @@ limitations under the License.
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/kernels/gather_nd_op.h"
 #include "tensorflow/core/platform/types.h"
-#include "tensorflow/core/util/cuda_kernel_helper.h"
+#include "tensorflow/core/util/gpu_kernel_helper.h"
 
 namespace tensorflow {
 
@@ -84,14 +84,13 @@ struct GatherNdSlice<GPUDevice, T, Index, IXDIM> {
       batch_indices[i - 1] = Tparams.dimension(i - 1);
       batch_strides[i - 1] = batch_strides[i] * Tparams.dimension(i);
     }
-    CudaLaunchConfig config = GetCudaLaunchConfig(out_size, d);
+    GpuLaunchConfig config = GetCudaLaunchConfig(out_size, d);
 
-    // clang-format off
-    GatherSliceOpKernel<T, Index, IXDIM>
-        <<<config.block_count, config.thread_per_block, 0, d.stream()>>>(
-            Tparams.data(), Tindices.data(), Tout.data(), batch_strides,
-            batch_indices, indices_size, s_size, out_size);
-    // clang-format on
+    TF_CHECK_OK(CudaLaunchKernel(GatherSliceOpKernel<T, Index, IXDIM>,
+                                 config.block_count, config.thread_per_block, 0,
+                                 d.stream(), Tparams.data(), Tindices.data(),
+                                 Tout.data(), batch_strides, batch_indices,
+                                 indices_size, s_size, out_size));
 
     // TODO(ebrevdo): enable indices validation on GPU.
     // Right now checking for indices out of bound in the kernel would
@@ -111,12 +110,16 @@ struct GatherNdSlice<GPUDevice, T, Index, IXDIM> {
   DEFINE_GPU_SPECS_INDEX_NDIM(T, Index, 2); \
   DEFINE_GPU_SPECS_INDEX_NDIM(T, Index, 3); \
   DEFINE_GPU_SPECS_INDEX_NDIM(T, Index, 4); \
-  DEFINE_GPU_SPECS_INDEX_NDIM(T, Index, 5);
+  DEFINE_GPU_SPECS_INDEX_NDIM(T, Index, 5); \
+  DEFINE_GPU_SPECS_INDEX_NDIM(T, Index, 6); \
+  DEFINE_GPU_SPECS_INDEX_NDIM(T, Index, 7);
 
 #define DEFINE_GPU_SPECS(T)         \
   DEFINE_GPU_SPECS_INDEX(T, int32); \
   DEFINE_GPU_SPECS_INDEX(T, int64);
 
+TF_CALL_int32(DEFINE_GPU_SPECS);
+TF_CALL_int64(DEFINE_GPU_SPECS);
 TF_CALL_GPU_NUMBER_TYPES(DEFINE_GPU_SPECS);
 TF_CALL_complex64(DEFINE_GPU_SPECS);
 TF_CALL_complex128(DEFINE_GPU_SPECS);
